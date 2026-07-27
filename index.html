@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FinTrack — Smart Finance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="toast-container"></div>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="modal-overlay hidden">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>Edit Transaction</h3>
+          <button class="modal-close" onclick="closeEditModal()">✕</button>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Amount (₹)</label
+            ><input type="number" id="edit-amount" step="0.01" />
+          </div>
+          <div class="form-group">
+            <label>Type</label
+            ><select id="edit-type" onchange="updateEditCategories()">
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Category</label
+            ><select id="edit-category"></select>
+          </div>
+          <div class="form-group">
+            <label>Description</label
+            ><input type="text" id="edit-description" />
+          </div>
+          <div class="form-group">
+            <label>Date</label><input type="date" id="edit-date" />
+          </div>
+        </div>
+        <input type="hidden" id="edit-id" />
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeEditModal()">
+            Cancel
+          </button>
+          <button class="btn btn-primary" onclick="saveEdit()">
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Voice Modal -->
+    <div id="voice-modal" class="modal-overlay hidden">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>🎙️ Review & Edit Voice Entry</h3>
+          <button class="modal-close" onclick="closeVoiceModal()">✕</button>
+        </div>
+        <p
+          style="
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+            font-size: 14px;
+          "
+        >
+          AI extracted these details — edit anything before saving:
+        </p>
+        <div id="voice-preview"></div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeVoiceModal()">
+            Discard
+          </button>
+          <button class="btn btn-primary" onclick="confirmVoiceTransaction()">
+            Confirm & Add
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auth -->
+    <div id="auth-section" class="auth-wrap">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <span class="brand-icon">◈</span
+          ><span class="brand-name">FinTrack</span>
+        </div>
+        <div id="login-form">
+          <h2 class="auth-title">Welcome back</h2>
+          <p class="auth-sub">Sign in to your account</p>
+          <div id="auth-error" class="msg-box msg-error hidden"></div>
+          <div class="form-group">
+            <label>Username</label
+            ><input
+              type="text"
+              id="login-username"
+              placeholder="Enter username"
+            />
+          </div>
+          <div class="form-group">
+            <label>Password</label
+            ><input
+              type="password"
+              id="login-password"
+              placeholder="Enter password"
+              onkeydown="if (event.key === 'Enter') login();"
+            />
+          </div>
+          <button class="btn btn-primary full-width" onclick="login()">
+            Sign In
+          </button>
+          <p class="auth-toggle-text">
+            No account? <a href="#" onclick="showRegister()">Create one</a>
+          </p>
+        </div>
+        <div id="register-form" class="hidden">
+          <h2 class="auth-title">Create account</h2>
+          <p class="auth-sub">Start tracking your finances</p>
+          <div id="register-error" class="msg-box msg-error hidden"></div>
+          <div class="form-group">
+            <label>Username</label
+            ><input
+              type="text"
+              id="register-username"
+              placeholder="Choose a username"
+            />
+          </div>
+          <div class="form-group">
+            <label>Password</label
+            ><input
+              type="password"
+              id="register-password"
+              placeholder="Min 6 characters"
+            />
+          </div>
+          <div class="form-group">
+            <label>Email <span class="optional">(optional)</span></label
+            ><input
+              type="email"
+              id="register-email"
+              placeholder="you@example.com"
+            />
+          </div>
+          <button class="btn btn-primary full-width" onclick="register()">
+            Create Account
+          </button>
+          <p class="auth-toggle-text">
+            Have an account? <a href="#" onclick="showLogin()">Sign in</a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="main-app" class="hidden">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+          <span class="brand-icon">◈</span
+          ><span class="brand-name">FinTrack</span>
+        </div>
+        <nav class="sidebar-nav">
+          <button
+            class="nav-item active"
+            data-tab="dashboard"
+            onclick="showTab('dashboard', this)"
+          >
+            <span class="nav-icon">▦</span> Dashboard
+          </button>
+          <button
+            class="nav-item"
+            data-tab="transactions"
+            onclick="showTab('transactions', this)"
+          >
+            <span class="nav-icon">⇄</span> Transactions
+          </button>
+          <button
+            class="nav-item"
+            data-tab="budgets"
+            onclick="showTab('budgets', this)"
+          >
+            <span class="nav-icon">◎</span> Budgets
+          </button>
+          <button
+            class="nav-item"
+            data-tab="reports"
+            onclick="showTab('reports', this)"
+          >
+            <span class="nav-icon">∿</span> Reports
+          </button>
+          <button
+            class="nav-item"
+            data-tab="advisor"
+            onclick="showTab('advisor', this)"
+          >
+            <span class="nav-icon">✦</span> AI Advisor
+          </button>
+          <button
+            class="nav-item"
+            data-tab="history"
+            onclick="showTab('history', this)"
+          >
+            <span class="nav-icon">≡</span> History
+          </button>
+        </nav>
+        <div class="sidebar-footer">
+          <button
+            class="theme-toggle"
+            onclick="toggleTheme()"
+            title="Toggle Dark Mode"
+          >
+            <span id="theme-icon">◑</span>
+          </button>
+          <button class="btn btn-ghost small" onclick="logout()">
+            Sign out
+          </button>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <button class="hamburger" onclick="toggleSidebar()">☰</button>
+          <div class="topbar-user">
+            <span class="user-avatar" id="user-avatar">D</span>
+            <span id="current-user" class="user-name"></span>
+          </div>
+        </header>
+
+        <!-- DASHBOARD -->
+        <section id="dashboard-tab" class="tab-section active">
+          <div class="page-header">
+            <h1>Dashboard</h1>
+            <p class="page-sub" id="dashboard-date"></p>
+          </div>
+          <div class="stat-grid">
+            <div class="stat-card accent">
+              <div class="stat-label">Net Balance</div>
+              <div class="stat-value" id="total-balance">₹0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Monthly Income</div>
+              <div class="stat-value positive" id="monthly-income">₹0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Monthly Expenses</div>
+              <div class="stat-value negative" id="monthly-expenses">₹0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Budget Remaining</div>
+              <div class="stat-value" id="budget-remaining">₹0</div>
+            </div>
+          </div>
+          <div class="health-section">
+            <div class="health-card">
+              <div class="health-left">
+                <h3>Financial Health Score</h3>
+                <p class="health-desc" id="health-desc">
+                  Loading your score...
+                </p>
+                <div class="health-tips" id="health-tips"></div>
+              </div>
+              <div class="health-right">
+                <div class="score-ring">
+                  <svg viewBox="0 0 120 120">
+                    <circle class="ring-bg" cx="60" cy="60" r="50" />
+                    <circle
+                      class="ring-fill"
+                      id="ring-fill"
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      stroke-dasharray="0 314"
+                    />
+                  </svg>
+                  <div class="score-num" id="score-num">--</div>
+                </div>
+                <div class="score-label" id="score-label">--</div>
+              </div>
+            </div>
+          </div>
+          <div class="quick-add-card">
+            <h3>Quick Add Transaction</h3>
+            <div class="quick-add-voice">
+              <button class="voice-btn" id="voice-btn" onclick="startVoice()">
+                <span class="voice-icon">🎙</span
+                ><span class="voice-label">Voice Entry</span>
+              </button>
+              <div class="voice-status" id="voice-status"></div>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Amount (₹)</label
+                ><input
+                  type="number"
+                  id="transaction-amount"
+                  placeholder="0.00"
+                  step="0.01"
+                />
+              </div>
+              <div class="form-group">
+                <label>Type</label
+                ><select id="transaction-type" onchange="updateCategories()">
+                  <option value="">Select type</option>
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Category</label
+                ><select id="transaction-category">
+                  <option value="">Select category</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Description</label
+                ><input
+                  type="text"
+                  id="transaction-description"
+                  placeholder="What was it for?"
+                />
+              </div>
+              <div class="form-group">
+                <label>Date</label><input type="date" id="transaction-date" />
+              </div>
+              <div class="form-group align-end">
+                <button
+                  class="btn btn-primary full-width"
+                  onclick="addTransaction()"
+                >
+                  Add Transaction
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="recent-section">
+            <div class="section-header">
+              <h3>Recent Transactions</h3>
+              <button
+                class="btn btn-ghost small"
+                onclick="
+                  showTab(
+                    'history',
+                    document.querySelector('[data-tab=history]'),
+                  )
+                "
+              >
+                View All
+              </button>
+            </div>
+            <div id="recent-list" class="recent-list"></div>
+          </div>
+        </section>
+
+        <!-- TRANSACTIONS -->
+        <section id="transactions-tab" class="tab-section hidden">
+          <div class="page-header"><h1>Add Transaction</h1></div>
+          <div class="card">
+            <div class="quick-add-voice">
+              <button class="voice-btn" onclick="startVoice()">
+                <span class="voice-icon">🎙</span
+                ><span class="voice-label">Voice Entry</span>
+              </button>
+              <div class="voice-status" id="voice-status2"></div>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Amount (₹)</label
+                ><input
+                  type="number"
+                  id="t2-amount"
+                  placeholder="0.00"
+                  step="0.01"
+                />
+              </div>
+              <div class="form-group">
+                <label>Type</label
+                ><select id="t2-type" onchange="updateCategories2()">
+                  <option value="">Select type</option>
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Category</label
+                ><select id="t2-category">
+                  <option value="">Select category</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Description</label
+                ><input
+                  type="text"
+                  id="t2-description"
+                  placeholder="What was it for?"
+                />
+              </div>
+              <div class="form-group">
+                <label>Date</label><input type="date" id="t2-date" />
+              </div>
+              <div class="form-group align-end">
+                <button
+                  class="btn btn-primary full-width"
+                  onclick="addTransaction2()"
+                >
+                  Add Transaction
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- BUDGETS -->
+        <section id="budgets-tab" class="tab-section hidden">
+          <div class="page-header"><h1>Budget Management</h1></div>
+          <div class="card" style="margin-bottom: 24px">
+            <h3 style="margin-bottom: 16px">Set Monthly Budget</h3>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Category</label
+                ><select id="budget-category">
+                  <option value="">Select category</option>
+                  <option value="Food">Food</option>
+                  <option value="Transportation">Transportation</option>
+                  <option value="Entertainment">Entertainment</option>
+                  <option value="Shopping">Shopping</option>
+                  <option value="Bills">Bills</option>
+                  <option value="Healthcare">Healthcare</option>
+                  <option value="Education">Education</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Monthly Limit (₹)</label
+                ><input
+                  type="number"
+                  id="budget-amount"
+                  placeholder="0.00"
+                  step="0.01"
+                />
+              </div>
+              <div class="form-group align-end">
+                <button
+                  class="btn btn-primary full-width"
+                  onclick="setBudget()"
+                >
+                  Set Budget
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="budget-progress" class="budget-grid"></div>
+        </section>
+
+        <!-- REPORTS -->
+        <section id="reports-tab" class="tab-section hidden">
+          <div class="page-header">
+            <h1>Reports</h1>
+            <div class="export-btns">
+              <button class="btn btn-ghost small" onclick="exportCSV()">
+                ↓ CSV</button
+              ><button class="btn btn-ghost small" onclick="exportPDF()">
+                ↓ PDF
+              </button>
+            </div>
+          </div>
+          <div class="charts-grid">
+            <div class="chart-card">
+              <h3>Expense by Category</h3>
+              <div class="chart-wrap"><canvas id="expense-chart"></canvas></div>
+            </div>
+            <div class="chart-card">
+              <h3>Income vs Expenses</h3>
+              <div class="chart-wrap"><canvas id="trend-chart"></canvas></div>
+            </div>
+            <div class="chart-card wide">
+              <h3>Monthly Overview</h3>
+              <div class="chart-wrap tall">
+                <canvas id="monthly-chart"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- AI ADVISOR -->
+        <section id="advisor-tab" class="tab-section hidden">
+          <div class="page-header">
+            <h1>AI Finance Advisor</h1>
+            <p class="page-sub">Powered by Gemini · Analyses your real data</p>
+          </div>
+          <div class="key-bar" id="key-bar">
+            <span class="key-bar-label">🔑 Gemini API Key:</span>
+            <input
+              type="password"
+              id="gemini-key-input"
+              placeholder="Paste your key here (AIzaSy...)"
+              oninput="handleKeyInput(this.value)"
+            />
+            <span id="key-bar-status"></span>
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              class="key-link"
+              >Get free key →</a
+            >
+          </div>
+          <div class="advisor-layout">
+            <div class="chat-container" id="chat-container">
+              <div class="advisor-status-bar">
+                <span id="advisor-status" class="advisor-status info"
+                  >Ask a question to get started.</span
+                >
+              </div>
+              <div class="chat-welcome" id="chat-welcome">
+                <div class="welcome-icon">✦</div>
+                <h3>Your personal finance AI</h3>
+                <p>Ask me anything about your spending, savings, or budgets.</p>
+                <div class="suggestion-chips">
+                  <button class="chip" onclick="askAdvisor(this.textContent)">
+                    How much did I spend on food this month?
+                  </button>
+                  <button class="chip" onclick="askAdvisor(this.textContent)">
+                    Am I overspending?
+                  </button>
+                  <button class="chip" onclick="askAdvisor(this.textContent)">
+                    Where can I save more money?
+                  </button>
+                  <button class="chip" onclick="askAdvisor(this.textContent)">
+                    Compare this month with last month
+                  </button>
+                  <button class="chip" onclick="askAdvisor(this.textContent)">
+                    What is my biggest expense category?
+                  </button>
+                  <button class="chip" onclick="askAdvisor(this.textContent)">
+                    Give me a savings plan
+                  </button>
+                </div>
+              </div>
+              <div class="chat-messages" id="chat-messages"></div>
+            </div>
+            <div class="chat-input-row">
+              <input
+                type="text"
+                id="advisor-input"
+                placeholder="Ask about your finances..."
+                onkeydown="if (event.key === 'Enter') sendAdvisorMessage();"
+              />
+              <button class="btn btn-primary" onclick="sendAdvisorMessage()">
+                Send
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- HISTORY -->
+        <section id="history-tab" class="tab-section hidden">
+          <div class="page-header">
+            <h1>Transaction History</h1>
+            <div class="export-btns">
+              <button class="btn btn-ghost small" onclick="exportCSV()">
+                ↓ CSV</button
+              ><button class="btn btn-ghost small" onclick="exportPDF()">
+                ↓ PDF
+              </button>
+            </div>
+          </div>
+          <div class="filter-bar">
+            <input
+              type="text"
+              id="search-input"
+              placeholder="🔍 Search..."
+              oninput="renderHistory()"
+            />
+            <select id="filter-type" onchange="renderHistory()">
+              <option value="">All Types</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+            <select id="filter-category" onchange="renderHistory()">
+              <option value="">All Categories</option>
+            </select>
+            <select id="filter-month" onchange="renderHistory()">
+              <option value="">All Months</option>
+            </select>
+            <select id="sort-by" onchange="renderHistory()">
+              <option value="date-desc">Newest First</option>
+              <option value="date-asc">Oldest First</option>
+              <option value="amount-desc">Highest Amount</option>
+              <option value="amount-asc">Lowest Amount</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Category</th>
+                  <th>Description</th>
+                  <th>Amount</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="transaction-history"></tbody>
+            </table>
+            <div id="empty-history" class="empty-state hidden">
+              <p>No transactions found.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
